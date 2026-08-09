@@ -20,7 +20,7 @@ Rendering rules that are permanent:
 
 Visuals: feathered portal edge, pulsing rim-glow, corner bracket accents,
 energy particles, cinematic vignette, and a designed HUD with an animated
-effect label and a live pinch-calibration gauge.
+effect label, FPS display, and controls hint.
 
 Controls:
   q            - quit
@@ -42,10 +42,15 @@ import os
 import random
 import subprocess
 import time
-import urllib.request
+import atexit
 
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
+
+from handportal.cli import parse_args
+from handportal.effects import EFFECT_NAMES, EFFECTS
+from handportal.gestures import PinchTrigger, pinch_distance as gesture_pinch_distance
+from handportal.model import ensure_model
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -60,7 +65,7 @@ except Exception:
 CAM_INDEX = 0
 FRAME_W, FRAME_H = 1280, 720
 
-PINCH_DIST_THRESHOLD = 0.06    # normalized landmark distance — adjust with +/- keys at runtime
+PINCH_DIST_THRESHOLD = 0.055   # pinch entry threshold; release uses a wider threshold
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hand_landmarker.task")
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
@@ -68,8 +73,6 @@ MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/han
 # Landmark indices we care about
 THUMB_TIP = 4
 INDEX_TIP = 8
-PINKY_TIP = 20
-WRIST = 0
 
 # ---- Theme (BGR) -----------------------------------------------------
 ACCENT         = (255, 170, 64)    # electric cyan
@@ -143,130 +146,8 @@ def _detect_screen_resolution():
 
 
 def ensure_model_downloaded():
-    if os.path.exists(MODEL_PATH):
-        return
-    print("Downloading hand_landmarker.task model (one-time, ~7MB)...")
-    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-    print(f"Saved model to {MODEL_PATH}")
-
-
-# ----------------------------------------------------------------------
-# Effects — each takes a BGR crop and returns a processed BGR image
-# ----------------------------------------------------------------------
-def fx_thermal(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-
-
-def fx_posterize_neon(img):
-    # Quantize colors then push saturation for a neon-poster look
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[..., 1] = np.clip(hsv[..., 1] * 1.8, 0, 255)
-    hsv[..., 2] = np.clip(hsv[..., 2] * 1.1, 0, 255)
-    boosted = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
-    div = 64
-    quant = (boosted // div) * div + div // 2
-    return quant.astype(np.uint8)
-
-
-_K2 = np.ones((2, 2), np.uint8)  # hoisted dilate kernel (avoid per-call alloc)
-
-
-def fx_edge_mesh(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 60, 150)
-    edges = cv2.dilate(edges, _K2, iterations=1)
-    # dotted/mesh feel: draw on a dark base with a subtle grid
-    base = np.full_like(img, (20, 20, 20))
-    base[edges > 0] = (255, 255, 255)
-    return base
-
-
-def fx_invert_glitch(img):
-    inv = 255 - img
-    # channel shift for a glitchy vibe
-    b, g, r = cv2.split(inv)
-    shift = 6
-    r = np.roll(r, shift, axis=1)
-    b = np.roll(b, -shift, axis=1)
-    return cv2.merge([b, g, r])
-
-
-def fx_grayscale_sketch(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    inv = 255 - gray
-    blur = cv2.GaussianBlur(inv, (21, 21), 0)
-    sketch = cv2.divide(gray, 255 - blur, scale=256)
-    return cv2.cvtColor(sketch, cv2.COLOR_GRAY2BGR)
-
-
-def fx_chromatic(img):
-    """Chromatic aberration: RGB channels split apart, edge-weighted."""
-    b, g, r = cv2.split(img)
-    shift = 8
-    r = np.roll(r, shift, axis=1)
-    b = np.roll(b, -shift, axis=1)
-    out = cv2.merge([b, g, r])
-    # push saturation a touch so the color fringing pops
-    hsv = cv2.cvtColor(out, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[..., 1] = np.clip(hsv[..., 1] * 1.25, 0, 255)
-    return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
-
-
-def fx_pixel_mosaic(img):
-    """Blocky mosaic: downscale hard, upscale nearest, faint grid lines."""
-    h, w = img.shape[:2]
-    block = 14
-    small = cv2.resize(img, (max(1, w // block), max(1, h // block)),
-                       interpolation=cv2.INTER_AREA)
-    out = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
-    # subtle grid seams between blocks (uint8 multiply keeps it fast)
-    seam = np.array([184], np.uint8)  # 184/255 = 0.72
-    out[::block, :] = cv2.multiply(out[::block, :], seam, scale=1.0 / 255.0)
-    out[:, ::block] = cv2.multiply(out[:, ::block], seam, scale=1.0 / 255.0)
-    return out
-
-
-_DUOTONE_LUT = None
-
-
-def _build_duotone_lut():
-    """256-entry BGR LUT for the duotone ramp (built once at import)."""
-    c0 = np.array([32, 24, 90], np.float32)     # BGR deep indigo
-    c1 = np.array([255, 196, 64], np.float32)   # BGR electric cyan
-    t = np.linspace(0.0, 1.0, 256, dtype=np.float32)[:, None]
-    return (t * c1 + (1.0 - t) * c0).astype(np.uint8)
-
-
-_DUOTONE_LUT = _build_duotone_lut()
-
-
-def fx_duotone(img):
-    """Duotone: luminance mapped onto a deep-indigo -> electric-cyan ramp."""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return _DUOTONE_LUT[gray]
-
-
-EFFECTS = [
-    fx_thermal,
-    fx_edge_mesh,
-    fx_posterize_neon,
-    fx_invert_glitch,
-    fx_grayscale_sketch,
-    fx_chromatic,
-    fx_pixel_mosaic,
-    fx_duotone,
-]
-EFFECT_NAMES = [
-    "Thermal",
-    "Edge Mesh",
-    "Posterize Neon",
-    "Invert Glitch",
-    "Sketch",
-    "Chromatic",
-    "Pixel Mosaic",
-    "Duotone",
-]
+    """Compatibility wrapper around the verified, atomic downloader."""
+    return ensure_model(MODEL_PATH)
 
 
 # ----------------------------------------------------------------------
@@ -300,42 +181,6 @@ class QuadSmoother:
 
     def reset(self):
         self.smoothed = None
-
-
-def order_quad_points(pts):
-    """Order 4 points as TL, TR, BR, BL for a consistent warp."""
-    pts = np.array(pts, dtype=np.float32)
-    s = pts.sum(axis=1)
-    diff = np.diff(pts, axis=1).flatten()
-    tl = pts[np.argmin(s)]
-    br = pts[np.argmax(s)]
-    tr = pts[np.argmin(diff)]
-    bl = pts[np.argmax(diff)]
-    return np.array([tl, tr, br, bl], dtype=np.float32)
-
-
-def build_quad_from_thumb_index(hand_a, hand_b, w, h):
-    """
-    Real 4-point quad using thumb tip + index tip of EACH hand (4 points
-    total) — the pinch-stretched quad from the earlier version. Kept here
-    unused in case we switch back; not called by the current pipeline.
-    """
-    p1 = landmark_px(hand_a[THUMB_TIP], w, h)
-    p2 = landmark_px(hand_a[INDEX_TIP], w, h)
-    p3 = landmark_px(hand_b[THUMB_TIP], w, h)
-    p4 = landmark_px(hand_b[INDEX_TIP], w, h)
-
-    pts = np.array([p1, p2, p3, p4], dtype=np.float32)
-    centroid = pts.mean(axis=0)
-    angles = np.arctan2(pts[:, 1] - centroid[1], pts[:, 0] - centroid[0])
-    order = np.argsort(angles)
-    ordered = pts[order]
-
-    dists_to_origin = ordered[:, 0] + ordered[:, 1]
-    start_idx = np.argmin(dists_to_origin)
-    ordered = np.roll(ordered, -start_idx, axis=0)
-
-    return ordered
 
 
 def build_quad_from_index_fingers(hand_a, hand_b, w, h):
@@ -601,13 +446,7 @@ def make_vignette_layer(w, h, strength=0.30, inner=0.45):
 # ----------------------------------------------------------------------
 def pinch_distance(hand_landmarks_list):
     """Returns normalized thumb-index distance for one hand."""
-    thumb = landmark_px(hand_landmarks_list[THUMB_TIP], 1, 1)
-    index = landmark_px(hand_landmarks_list[INDEX_TIP], 1, 1)
-    return dist(thumb, index)
-
-
-def is_pinching(hand_landmarks_list, threshold):
-    return pinch_distance(hand_landmarks_list) < threshold
+    return gesture_pinch_distance(hand_landmarks_list, THUMB_TIP, INDEX_TIP)
 
 
 # ----------------------------------------------------------------------
@@ -791,14 +630,27 @@ def _fill_window(frame, win_w, win_h):
 # ----------------------------------------------------------------------
 # Main loop
 # ----------------------------------------------------------------------
-def main():
-    ensure_model_downloaded()
+def main(argv=None):
+    global CAM_INDEX, FRAME_W, FRAME_H, FULLSCREEN, DETECT_DOWNSCALE, VIGNETTE, MODEL_PATH
+    args = parse_args(argv)
+    CAM_INDEX, FRAME_W, FRAME_H = args.camera, args.width, args.height
+    FULLSCREEN = not args.windowed
+    DETECT_DOWNSCALE = args.downscale
+    VIGNETTE = not args.no_vignette
+    if args.model:
+        MODEL_PATH = os.path.abspath(os.path.expanduser(args.model))
+    try:
+        ensure_model_downloaded()
+    except RuntimeError as exc:
+        print(f"Startup error: {exc}")
+        return 1
 
     cap = cv2.VideoCapture(CAM_INDEX)
 
     if not cap.isOpened():
-        print("Could not open webcam. Check CAM_INDEX.")
-        return
+        print(f"Could not open webcam {CAM_INDEX}. Try --camera with another index.")
+        return 1
+    atexit.register(cap.release)
 
     # Ask for a 16:9 feed so the fullscreen fill is a 1:1 pixel map on 16:9
     # monitors (zero crop, zero stretch). Some backends ignore the request,
@@ -822,14 +674,19 @@ def main():
         min_tracking_confidence=0.6,
         running_mode=mp_vision.RunningMode.VIDEO,
     )
-    landmarker = mp_vision.HandLandmarker.create_from_options(options)
+    try:
+        landmarker = mp_vision.HandLandmarker.create_from_options(options)
+    except Exception as exc:
+        cap.release()
+        print(f"Could not initialize MediaPipe: {exc}")
+        return 1
+    atexit.register(landmarker.close)
+    atexit.register(cv2.destroyAllWindows)
 
     # ---- app state ---------------------------------------------------
     effect_idx = 0
     shot_count = 0
-    frame_idx = 0
-    pinch_threshold = PINCH_DIST_THRESHOLD
-    pinch_armed = True  # True = ready to fire on next pinch; False = pinched, waiting for release
+    pinch_trigger = PinchTrigger(args.pinch_threshold, min(0.22, args.pinch_threshold + 0.015))
     quad_smoother = QuadSmoother(alpha=0.35)
 
     detect_downscale = DETECT_DOWNSCALE
@@ -884,6 +741,7 @@ def main():
     while True:
         ok, frame = cap.read()
         if not ok:
+            print("Camera stopped returning frames; closing HandPortal.")
             break
 
         frame = cv2.flip(frame, 1)
@@ -916,13 +774,11 @@ def main():
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
         # VIDEO mode wants a monotonically increasing timestamp in ms
-        timestamp_ms = int(frame_idx * (1000 / 30))
-        frame_idx += 1
+        timestamp_ms = int((now - t0) * 1000)
         result = landmarker.detect_for_video(mp_image, timestamp_ms)
 
         # ---- pinch + box (independent systems, as required) -----------
-        pinch_detected_this_frame = False
-        min_pinch_dist = None
+        pinch_distances = []
         quad_pts = None
 
         hands_list = result.hand_landmarks  # list of list-of-21-landmarks
@@ -934,20 +790,14 @@ def main():
 
             for hand in (hand_a, hand_b):
                 d = pinch_distance(hand)
-                if min_pinch_dist is None or d < min_pinch_dist:
-                    min_pinch_dist = d
-                if d < pinch_threshold:
-                    pinch_detected_this_frame = True
+                pinch_distances.append(d)
 
         elif len(hands_list) == 1:
             # Still check single-hand pinch even if portal isn't formed
             quad_smoother.reset()
             for hand in hands_list:
                 d = pinch_distance(hand)
-                if min_pinch_dist is None or d < min_pinch_dist:
-                    min_pinch_dist = d
-                if d < pinch_threshold:
-                    pinch_detected_this_frame = True
+                pinch_distances.append(d)
 
         else:
             quad_smoother.reset()
@@ -955,12 +805,8 @@ def main():
         # Edge-triggered switch: fire exactly once when pinch is first detected,
         # then require release (distance back above threshold) before it can
         # fire again. (No time-based cooldown — armed/disarmed state machine.)
-        if pinch_detected_this_frame:
-            if pinch_armed:
-                do_switch((effect_idx + 1) % len(EFFECTS))
-                pinch_armed = False
-        else:
-            pinch_armed = True
+        if pinch_trigger.update(pinch_distances):
+            do_switch((effect_idx + 1) % len(EFFECTS))
 
         # ---- crossfade + label animation progress ---------------------
         if crossfade_prev_idx is not None:
@@ -1077,15 +923,17 @@ def main():
             break
         elif key == ord('s'):
             shot_count += 1
-            fname = f"portal_shot_{shot_count}.png"
-            cv2.imwrite(fname, frame)
-            print(f"Saved {fname}")
+            fname = f"portal_shot_{time.strftime('%Y%m%d-%H%M%S')}-{shot_count}.png"
+            if cv2.imwrite(fname, frame):
+                print(f"Saved {fname}")
+            else:
+                print(f"Could not save screenshot to {os.path.abspath(fname)}")
         elif key in (ord('+'), ord('=')):
-            pinch_threshold = min(0.20, pinch_threshold + 0.005)
-            print(f"Pinch threshold: {pinch_threshold:.3f}")
+            pinch_trigger.adjust(0.005)
+            print(f"Pinch thresholds: {pinch_trigger.enter_threshold:.3f}/{pinch_trigger.release_threshold:.3f}")
         elif key == ord('-'):
-            pinch_threshold = max(0.005, pinch_threshold - 0.005)
-            print(f"Pinch threshold: {pinch_threshold:.3f}")
+            pinch_trigger.adjust(-0.005)
+            print(f"Pinch thresholds: {pinch_trigger.enter_threshold:.3f}/{pinch_trigger.release_threshold:.3f}")
         elif ord('1') <= key <= ord('9'):
             n = key - ord('1')
             if n < len(EFFECTS):
@@ -1118,7 +966,8 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
     landmarker.close()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

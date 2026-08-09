@@ -2,7 +2,7 @@
   <img src="assets/banner.jpg" alt="HandPortal Banner" width="100%"/>
 </p>
 
-<h1 align="center">🖐️ HandPortal</h1>
+<h1 align="center">🖐️ Vision Hands — HandPortal</h1>
 
 <p align="center">
   <b>Stretch a portal between your fingertips — reality gets a different skin inside.</b>
@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/python-3.9+-blue?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/MediaPipe-Hand_Tracking-4285F4?style=for-the-badge&logo=google&logoColor=white" />
   <img src="https://img.shields.io/badge/OpenCV-Real_Time-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" />
+  <a href="https://github.com/NoorullahZamindar-007/vision-hands/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" /></a>
 </p>
 
 <br/>
@@ -60,19 +60,31 @@ No external hardware. No depth sensor. Just a webcam and your hands.
 ### Installation
 
 ```bash
-# Clone the repo
-git clone https://github.com/<your-username>/handportal.git
-cd handportal
+# Clone the repository
+git clone https://github.com/NoorullahZamindar-007/vision-hands.git
+cd vision-hands
 
-# Install dependencies
-pip install -r requirements.txt
+# Create an isolated environment and install HandPortal
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python3 -m pip install -e .
 
 # Run it
-python portal_app.py
+handportal
 ```
 
 > [!NOTE]
 > On first launch, the MediaPipe hand landmark model (~7 MB) is automatically downloaded. No manual setup needed.
+> The download is written atomically and verified with SHA-256 before it is used.
+
+### Command-line options
+
+```bash
+handportal --camera 1 --width 1280 --height 720
+handportal --windowed --downscale --no-vignette
+handportal --pinch-threshold 0.06
+handportal --help
+```
 
 ---
 
@@ -105,12 +117,12 @@ Webcam → MediaPipe Hand Landmarker (2 hands, 21 landmarks each)
                     │       └─ Crop region → apply effect UNDISTORTED → feathered mask composite
                     │
                     └─ Thumb + index distance → edge-triggered pinch detector
-                            └─ armed/disarmed state machine (no cooldown timer)
+                            └─ hysteresis state machine (separate pinch/release thresholds)
 ```
 
 **Key design rules:**
 - **No perspective warping** — the effect content is never distorted. The bounding region is cropped, processed straight, pasted back, then clipped to the portal shape.
-- **Pinch detection is architecturally separate** from portal rendering — it reads raw landmarks directly with an edge-triggered state machine (fires once per pinch gesture, hold as long as you want).
+- **Pinch detection is architecturally separate** from portal rendering. Separate enter/release thresholds prevent noisy landmarks from switching effects repeatedly.
 - Portal edges are **feathered with a Gaussian blur** for soft blending instead of a hard cutout.
 - **Exponential moving average** smooths the quad position across frames, eliminating jitter.
 - Portal materializes with a **fade-in + scale-in** animation; effect switches use a **crossfade** transition.
@@ -131,12 +143,15 @@ Webcam → MediaPipe Hand Landmarker (2 hands, 21 landmarks each)
 
 ```
 handportal/
-├── portal_app.py       # Everything — effects, detection, rendering, HUD, main loop
-├── requirements.txt    # Python dependencies
-├── preview.png         # Screenshot
+├── handportal/         # CLI, configuration, effects, gestures, and model management
+├── portal_app.py       # Effects, rendering, HUD, and application loop
+├── tests/              # Webcam-independent automated tests
+├── pyproject.toml      # Package metadata and development tool configuration
+├── requirements.txt    # Bounded runtime dependencies
+├── requirements-dev.txt
 ├── assets/
 │   ├── banner.jpg      # README hero image
-│   └── preview.png     # Screenshot copy
+│   └── preview.png     # Screenshot
 └── .gitignore
 ```
 
@@ -152,10 +167,34 @@ All tunable parameters are at the top of `portal_app.py`:
 |-----------|---------|-------------|
 | `CAM_INDEX` | `0` | Camera device index |
 | `FRAME_W` / `FRAME_H` | `1280×720` | Requested camera resolution |
-| `PINCH_DIST_THRESHOLD` | `0.06` | Normalized landmark distance for pinch detection |
+| `PINCH_DIST_THRESHOLD` | `0.055` | Normalized pinch-entry distance; release defaults to `0.070` |
 | `FULLSCREEN` | `True` | Start in fullscreen mode |
 | `DETECT_DOWNSCALE` | `False` | Half-resolution detection for performance |
 | `VIGNETTE` | `True` | Cinematic vignette overlay |
+
+Most settings can also be supplied without editing source; run `handportal --help`.
+
+---
+
+## 🧪 Development
+
+```bash
+python3 -m pip install -e '.[dev]'
+python3 -m pytest
+ruff check .
+```
+
+The test suite covers gesture hysteresis, model integrity checks, effects, geometry smoothing, window filling, and CLI validation without opening a webcam.
+
+---
+
+## 🛠️ Troubleshooting
+
+- **Camera does not open:** try `handportal --camera 1` (or another device index), and close apps already using the webcam.
+- **Linux window or camera issues:** ensure your user can access `/dev/video*` and that a desktop session is active.
+- **macOS/Windows permission prompt:** allow camera access for your terminal or Python installation.
+- **Model download fails:** check the connection, or manually place the official `hand_landmarker.task` beside `portal_app.py`. Invalid files are rejected by checksum.
+- **Low frame rate:** use `handportal --downscale`, reduce `--width`/`--height`, or disable the vignette.
 
 ---
 
@@ -174,8 +213,12 @@ Pull requests are welcome! Some ideas:
 
 This project is licensed under the [MIT License](LICENSE).
 
+## 👤 Author
+
+**[Noorullah Zamindar](https://github.com/NoorullahZamindar-007)** — AI engineer, data scientist, automation developer, and Python web developer based in Afghanistan. See my [public professional profile](https://www.fiverr.com/noor_khan_z).
+
 ---
 
 <p align="center">
-  <sub>Built with OpenCV, MediaPipe, and way too much fun 🎉</sub>
+  <sub>Created by Noorullah Zamindar with OpenCV and MediaPipe 🎉</sub>
 </p>

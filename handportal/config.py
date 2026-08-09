@@ -1,0 +1,10 @@
+"""Application defaults shared by the CLI and runtime."""
+
+CAM_INDEX = 0
+FRAME_W = 1280
+FRAME_H = 720
+PINCH_ENTER_THRESHOLD = 0.055
+PINCH_RELEASE_THRESHOLD = 0.070
+FULLSCREEN = True
+DETECT_DOWNSCALE = False
+VIGNETTE = True
