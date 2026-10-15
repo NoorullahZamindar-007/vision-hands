@@ -1,10 +1,10 @@
 """Safe acquisition of the MediaPipe hand landmark model."""
 
-from hashlib import sha256
-from pathlib import Path
 import tempfile
 import urllib.error
 import urllib.request
+from hashlib import sha256
+from pathlib import Path
 
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"

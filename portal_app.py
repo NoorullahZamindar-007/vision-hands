@@ -34,22 +34,23 @@ Controls:
   Pinch        - cycle effect (thumb + index touch, either hand, once per pinch)
 """
 
-import cv2
-import numpy as np
-import mediapipe as mp
+import atexit
 import math
 import os
 import random
 import subprocess
 import time
-import atexit
 
+import cv2
+import mediapipe as mp
+import numpy as np
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
 from handportal.cli import parse_args
 from handportal.effects import EFFECT_NAMES, EFFECTS
-from handportal.gestures import PinchTrigger, pinch_distance as gesture_pinch_distance
+from handportal.gestures import PinchTrigger
+from handportal.gestures import pinch_distance as gesture_pinch_distance
 from handportal.model import ensure_model
 
 try:
@@ -752,7 +753,7 @@ def main(argv=None):
         last_time = now
         t = now - t0
 
-        def do_switch(new_idx):
+        def do_switch(new_idx, now=now):
             nonlocal effect_idx, crossfade_prev_idx, crossfade_start, label_from, label_anim_start
             if new_idx == effect_idx:
                 return

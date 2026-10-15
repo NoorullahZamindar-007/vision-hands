@@ -1,7 +1,7 @@
 """Gesture primitives independent from MediaPipe's runtime."""
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
 
 def normalized_distance(a, b):
