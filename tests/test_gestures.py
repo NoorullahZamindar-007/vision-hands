@@ -31,3 +31,34 @@ def test_trigger_fires_once_until_full_release():
 def test_trigger_validates_thresholds():
     with pytest.raises(ValueError):
         PinchTrigger(0.08, 0.07)
+
+
+def test_adjust_keeps_hysteresis_width():
+    trigger = PinchTrigger(0.055, 0.070)
+    trigger.adjust(0.005)
+    assert trigger.enter_threshold == pytest.approx(0.060)
+    assert trigger.release_threshold == pytest.approx(0.075)
+
+    trigger.adjust(-0.010)
+    assert trigger.enter_threshold == pytest.approx(0.050)
+    assert trigger.release_threshold == pytest.approx(0.065)
+
+
+def test_adjust_clamps_enter_threshold_bounds():
+    trigger = PinchTrigger(0.055, 0.070)
+    trigger.adjust(-1.0)
+    assert trigger.enter_threshold == pytest.approx(0.005)
+    assert trigger.release_threshold > trigger.enter_threshold
+
+    trigger.adjust(1.0)
+    assert trigger.enter_threshold == pytest.approx(0.20)
+    assert trigger.release_threshold > trigger.enter_threshold
+
+
+def test_adjusted_trigger_still_fires_and_releases():
+    trigger = PinchTrigger(0.055, 0.070)
+    trigger.adjust(0.010)  # enter 0.065, release 0.080
+    assert trigger.update([0.060]) is True
+    assert trigger.update([0.070]) is False  # between enter and release: no refire
+    assert trigger.update([0.085]) is False  # released
+    assert trigger.update([0.060]) is True
