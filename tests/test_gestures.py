@@ -62,3 +62,15 @@ def test_adjusted_trigger_still_fires_and_releases():
     assert trigger.update([0.070]) is False  # between enter and release: no refire
     assert trigger.update([0.085]) is False  # released
     assert trigger.update([0.060]) is True
+
+
+def test_reset_restores_initial_thresholds():
+    trigger = PinchTrigger(0.055, 0.070)
+    trigger.adjust(0.005)
+    trigger.update([0.050])  # fire once so the trigger is disarmed
+    assert trigger.armed is False
+
+    trigger.reset()
+    assert trigger.enter_threshold == pytest.approx(0.055)
+    assert trigger.release_threshold == pytest.approx(0.070)
+    assert trigger.armed is True

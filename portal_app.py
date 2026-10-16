@@ -27,6 +27,7 @@ Controls:
   s            - screenshot (incrementing filename)
   1..8         - jump directly to a specific effect
   +/-          - adjust pinch sensitivity (threshold printed to console)
+  r            - reset pinch sensitivity to the startup defaults
   f            - toggle fullscreen
   d            - toggle downscaled hand detection (faster, but slightly
                  less accurate; off by default)
@@ -935,6 +936,9 @@ def main(argv=None):
         elif key == ord('-'):
             pinch_trigger.adjust(-0.005)
             print(f"Pinch thresholds: {pinch_trigger.enter_threshold:.3f}/{pinch_trigger.release_threshold:.3f}")
+        elif key == ord('r'):
+            pinch_trigger.reset()
+            print(f"Pinch thresholds reset: {pinch_trigger.enter_threshold:.3f}/{pinch_trigger.release_threshold:.3f}")
         elif ord('1') <= key <= ord('9'):
             n = key - ord('1')
             if n < len(EFFECTS):

@@ -24,6 +24,8 @@ class PinchTrigger:
     def __post_init__(self):
         if not 0 < self.enter_threshold < self.release_threshold:
             raise ValueError("pinch thresholds must satisfy 0 < enter < release")
+        self._initial_enter = self.enter_threshold
+        self._initial_release = self.release_threshold
 
     def update(self, distances):
         values = tuple(distances)
@@ -38,3 +40,9 @@ class PinchTrigger:
         width = self.release_threshold - self.enter_threshold
         self.enter_threshold = min(0.20, max(0.005, self.enter_threshold + delta))
         self.release_threshold = min(0.22, self.enter_threshold + width)
+
+    def reset(self):
+        """Restore the thresholds this trigger was constructed with."""
+        self.enter_threshold = self._initial_enter
+        self.release_threshold = self._initial_release
+        self.armed = True
