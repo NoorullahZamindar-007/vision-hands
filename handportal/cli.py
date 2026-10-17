@@ -19,9 +19,12 @@ def build_parser():
 
 
 def parse_args(argv=None):
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.camera < 0:
+        parser.error("camera index must be non-negative")
     if args.width <= 0 or args.height <= 0:
-        build_parser().error("width and height must be positive")
+        parser.error("width and height must be positive")
     if not 0.005 <= args.pinch_threshold <= 0.20:
-        build_parser().error("pinch threshold must be between 0.005 and 0.20")
+        parser.error("pinch threshold must be between 0.005 and 0.20")
     return args
