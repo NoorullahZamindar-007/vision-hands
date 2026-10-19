@@ -99,6 +99,7 @@ handportal --help
 | `d` | Toggle downscaled detection (faster, slightly less accurate) |
 | `v` | Toggle cinematic vignette |
 | `+` / `-` | Adjust pinch sensitivity |
+| `r` | Reset pinch sensitivity to the startup defaults |
 | `q` | Quit |
 
 ---
@@ -161,18 +162,18 @@ handportal/
 
 ## ⚙️ Configuration
 
-All tunable parameters are at the top of `portal_app.py`:
+Defaults live in `handportal/config.py` (single source of truth) and are
+overridden by command-line flags at startup; run `handportal --help`.
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `CAM_INDEX` | `0` | Camera device index |
-| `FRAME_W` / `FRAME_H` | `1280×720` | Requested camera resolution |
-| `PINCH_DIST_THRESHOLD` | `0.055` | Normalized pinch-entry distance; release defaults to `0.070` |
-| `FULLSCREEN` | `True` | Start in fullscreen mode |
-| `DETECT_DOWNSCALE` | `False` | Half-resolution detection for performance |
-| `VIGNETTE` | `True` | Cinematic vignette overlay |
-
-Most settings can also be supplied without editing source; run `handportal --help`.
+| Parameter | CLI flag | Default | Description |
+|-----------|----------|---------|-------------|
+| `CAM_INDEX` | `--camera` | `0` | Camera device index |
+| `FRAME_W` / `FRAME_H` | `--width` / `--height` | `1280×720` | Requested camera resolution |
+| `PINCH_ENTER_THRESHOLD` | `--pinch-threshold` | `0.055` | Normalized pinch-entry distance |
+| `PINCH_RELEASE_THRESHOLD` | — | `0.070` | Normalized pinch-release distance (hysteresis gap) |
+| `FULLSCREEN` | `--windowed` | `True` | Start in fullscreen mode |
+| `DETECT_DOWNSCALE` | `--downscale` | `False` | Half-resolution detection for performance |
+| `VIGNETTE` | `--no-vignette` | `True` | Cinematic vignette overlay |
 
 ---
 

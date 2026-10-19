@@ -48,6 +48,7 @@ import numpy as np
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
+from handportal import config
 from handportal.cli import parse_args
 from handportal.effects import EFFECT_NAMES, EFFECTS
 from handportal.gestures import PinchTrigger
@@ -64,13 +65,12 @@ except Exception:
 # ----------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------
-CAM_INDEX = 0
-FRAME_W, FRAME_H = 1280, 720
-
-PINCH_DIST_THRESHOLD = 0.055   # pinch entry threshold; release uses a wider threshold
+# App defaults are single-sourced from handportal.config; main() then
+# overwrites them from the parsed CLI arguments at startup.
+CAM_INDEX = config.CAM_INDEX
+FRAME_W, FRAME_H = config.FRAME_W, config.FRAME_H
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hand_landmarker.task")
-MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 
 # Landmark indices we care about
 THUMB_TIP = 4
@@ -101,9 +101,9 @@ GLOW_SIGMA     = 9.0     # bloom softness
 MAX_PARTICLES  = 150
 
 # ---- Window / performance --------------------------------------------
-FULLSCREEN       = True   # open fullscreen (toggle with 'f' at runtime)
-DETECT_DOWNSCALE = False  # toggle with 'd' at runtime (off = max accuracy)
-VIGNETTE         = True   # toggle with 'v' at runtime
+FULLSCREEN       = config.FULLSCREEN        # open fullscreen (toggle with 'f' at runtime)
+DETECT_DOWNSCALE = config.DETECT_DOWNSCALE  # toggle with 'd' at runtime (off = max accuracy)
+VIGNETTE         = config.VIGNETTE         # toggle with 'v' at runtime
 
 
 def _detect_screen_resolution():
