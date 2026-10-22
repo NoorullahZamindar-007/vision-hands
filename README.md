@@ -177,6 +177,31 @@ overridden by command-line flags at startup; run `handportal --help`.
 
 ---
 
+## 🧩 Use as a Library
+
+The CLI is a thin wrapper: `handportal` is importable on its own, and the
+OpenCV-based effects stay lazy (no `cv2` import until you touch one).
+
+```python
+from handportal import PinchTrigger, ensure_model
+
+# Downloads the MediaPipe model on first run and checksum-verifies it.
+model_path = ensure_model("assets/hand_landmarker.task")
+
+# Pinch detection without any rendering or camera code: feed it a
+# sequence of thumb-tip to index-tip distances per frame.
+trigger = PinchTrigger()
+for distance in pinch_distances:
+    if trigger.update([distance]):
+        print("pinch started")   # edge-triggered; hysteresis rejects jitter
+
+# Effects are importable the same way (these need OpenCV):
+from handportal import thermal
+stylized = thermal(frame)
+```
+
+---
+
 ## 🧪 Development
 
 ```bash
