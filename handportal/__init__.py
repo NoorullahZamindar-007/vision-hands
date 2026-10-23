@@ -11,8 +11,12 @@ a camera stack installed.
 """
 
 import importlib
+from importlib.metadata import PackageNotFoundError, version
 
-__version__ = "1.1.0"
+try:
+    __version__ = version("handportal")
+except PackageNotFoundError:  # not installed (e.g. running from a bare checkout)
+    __version__ = "0.0.0+dev"
 
 from .config import (
     CAM_INDEX,
