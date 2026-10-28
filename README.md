@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.9+-blue?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/MediaPipe-Hand_Tracking-4285F4?style=for-the-badge&logo=google&logoColor=white" />
   <img src="https://img.shields.io/badge/OpenCV-Real_Time-5C3EE8?style=for-the-badge&logo=opencv&logoColor=white" />
   <a href="https://github.com/NoorullahZamindar-007/vision-hands/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" /></a>
@@ -54,7 +54,7 @@ No external hardware. No depth sensor. Just a webcam and your hands.
 
 ### Prerequisites
 
-- **Python 3.9+**
+- **Python 3.10+**
 - A working **webcam**
 
 ### Installation
