@@ -174,6 +174,7 @@ overridden by command-line flags at startup; run `handportal --help`.
 | `FULLSCREEN` | `--windowed` | `True` | Start in fullscreen mode |
 | `DETECT_DOWNSCALE` | `--downscale` | `False` | Half-resolution detection for performance |
 | `VIGNETTE` | `--no-vignette` | `True` | Cinematic vignette overlay |
+| — | `--model` | `hand_landmarker.task` (repo root) | Path to an existing `hand_landmarker.task` file (must exist; a missing path is rejected instead of triggering a download there) |
 
 ---
 
