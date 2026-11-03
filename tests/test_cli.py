@@ -22,3 +22,17 @@ def test_cli_rejects_negative_camera_index():
 def test_cli_rejects_out_of_range_pinch_threshold():
     with pytest.raises(SystemExit):
         parse_args(["--pinch-threshold", "0.5"])
+
+
+def test_cli_rejects_missing_model_file():
+    # A typo'd --model path used to silently download a fresh model to the
+    # mistyped path instead of failing fast.
+    with pytest.raises(SystemExit):
+        parse_args(["--model", "no-such-model.task"])
+
+
+def test_cli_accepts_existing_model_file(tmp_path):
+    model = tmp_path / "hand_landmarker.task"
+    model.write_bytes(b"fake-model")
+    args = parse_args(["--model", str(model)])
+    assert args.model == str(model)

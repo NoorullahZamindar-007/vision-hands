@@ -1,6 +1,7 @@
 """Command-line interface for HandPortal."""
 
 import argparse
+import os
 
 from . import config
 
@@ -27,4 +28,11 @@ def parse_args(argv=None):
         parser.error("width and height must be positive")
     if not 0.005 <= args.pinch_threshold <= 0.20:
         parser.error("pinch threshold must be between 0.005 and 0.20")
+    if args.model is not None:
+        # An explicit --model path is a user choice, not a download target:
+        # without this check a typo silently downloads a fresh model to the
+        # mistyped path instead of using the intended file.
+        model_path = os.path.expanduser(args.model)
+        if not os.path.isfile(model_path):
+            parser.error(f"model file does not exist: {args.model}")
     return args

@@ -23,3 +23,12 @@ def test_existing_corrupt_model_is_rejected(tmp_path):
     model.write_bytes(b"corrupt")
     with pytest.raises(RuntimeError, match="checksum"):
         ensure_model(model, expected_sha256="0" * 64)
+
+
+def test_model_path_that_is_a_directory_is_rejected(tmp_path):
+    # A directory at the model path used to crash inside the checksum read
+    # with a raw IsADirectoryError instead of a clear startup error.
+    model_dir = tmp_path / "model.task"
+    model_dir.mkdir()
+    with pytest.raises(RuntimeError, match="not a file"):
+        ensure_model(model_dir, expected_sha256="0" * 64)

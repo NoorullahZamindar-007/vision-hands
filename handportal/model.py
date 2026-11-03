@@ -22,6 +22,8 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
     """Return a verified model path, downloading atomically when absent."""
     target = Path(path)
     if target.exists():
+        if not target.is_file():
+            raise RuntimeError(f"Model path is not a file: {target}.")
         if file_sha256(target) != expected_sha256:
             raise RuntimeError(f"Model checksum failed: {target}. Delete it and retry.")
         return target
