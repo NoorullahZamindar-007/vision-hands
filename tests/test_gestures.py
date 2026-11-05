@@ -74,3 +74,15 @@ def test_reset_restores_initial_thresholds():
     assert trigger.enter_threshold == pytest.approx(0.055)
     assert trigger.release_threshold == pytest.approx(0.070)
     assert trigger.armed is True
+
+
+def test_non_finite_distances_do_not_break_trigger():
+    # A NaN reading is neither a pinch nor (under raw comparisons) a
+    # release: without filtering, a disarmed trigger stuck on NaN input
+    # never re-armed and pinch-to-switch died silently.
+    trigger = PinchTrigger(0.055, 0.070)
+    assert trigger.update([0.050]) is True  # disarmed
+    assert trigger.update([float("nan")]) is False  # no pinch, but re-arms
+    assert trigger.armed is True
+    assert trigger.update([float("nan")]) is False  # armed: NaN is not a pinch
+    assert trigger.update([0.050]) is True

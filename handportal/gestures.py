@@ -28,7 +28,13 @@ class PinchTrigger:
         self._initial_release = self.release_threshold
 
     def update(self, distances):
-        values = tuple(distances)
+        # A non-finite reading (NaN/inf from a glitchy landmark) is not a
+        # pinch, but it is also not a release: comparing against it is
+        # False either way, so a disarmed trigger would never re-arm and
+        # pinch-to-switch would die silently. Drop such readings, which
+        # makes them behave like a missing hand (no pinch, and a disarmed
+        # trigger re-arms on the empty set, as before).
+        values = tuple(d for d in distances if math.isfinite(d))
         if self.armed and any(d < self.enter_threshold for d in values):
             self.armed = False
             return True
