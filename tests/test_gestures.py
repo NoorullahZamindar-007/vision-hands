@@ -86,3 +86,15 @@ def test_non_finite_distances_do_not_break_trigger():
     assert trigger.armed is True
     assert trigger.update([float("nan")]) is False  # armed: NaN is not a pinch
     assert trigger.update([0.050]) is True
+
+
+def test_non_numeric_distances_do_not_break_trigger():
+    # A None or string reading used to raise TypeError inside
+    # math.isfinite and kill the gesture loop; like NaN it is now
+    # dropped, so a disarmed trigger re-arms and a real pinch still fires.
+    trigger = PinchTrigger(0.055, 0.070)
+    assert trigger.update([0.050]) is True  # disarmed
+    assert trigger.update([None, "0.09"]) is False  # no pinch, but re-arms
+    assert trigger.armed is True
+    assert trigger.update([None]) is False  # armed: not a pinch
+    assert trigger.update([0.050]) is True

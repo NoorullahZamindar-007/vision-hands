@@ -33,8 +33,14 @@ class PinchTrigger:
         # False either way, so a disarmed trigger would never re-arm and
         # pinch-to-switch would die silently. Drop such readings, which
         # makes them behave like a missing hand (no pinch, and a disarmed
-        # trigger re-arms on the empty set, as before).
-        values = tuple(d for d in distances if math.isfinite(d))
+        # trigger re-arms on the empty set, as before). A non-numeric
+        # reading (None, or a stray string from a caller passing raw
+        # landmark data) used to raise TypeError inside math.isfinite
+        # and kill the gesture loop; drop those the same way.
+        values = tuple(
+            d for d in distances
+            if isinstance(d, (int, float)) and not isinstance(d, bool) and math.isfinite(d)
+        )
         if self.armed and any(d < self.enter_threshold for d in values):
             self.armed = False
             return True
