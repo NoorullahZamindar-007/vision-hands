@@ -28,6 +28,13 @@ class PinchTrigger:
         self._initial_release = self.release_threshold
 
     def update(self, distances):
+        # A single reading (or None for "no hand") is a natural call:
+        # without this the generator below raises TypeError on a
+        # non-iterable instead of treating it as one reading (or none).
+        if distances is None:
+            distances = []
+        elif isinstance(distances, (int, float)) and not isinstance(distances, bool):
+            distances = [distances]
         # A non-finite reading (NaN/inf from a glitchy landmark) is not a
         # pinch, but it is also not a release: comparing against it is
         # False either way, so a disarmed trigger would never re-arm and

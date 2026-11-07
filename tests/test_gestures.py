@@ -98,3 +98,17 @@ def test_non_numeric_distances_do_not_break_trigger():
     assert trigger.armed is True
     assert trigger.update([None]) is False  # armed: not a pinch
     assert trigger.update([0.050]) is True
+
+
+def test_scalar_and_none_distances_do_not_break_trigger():
+    # A bare number or None is not iterable, so update() used to raise
+    # TypeError on the generator instead of treating it as one reading
+    # (or no hand at all).
+    trigger = PinchTrigger(0.055, 0.070)
+    assert trigger.update(0.050) is True  # single reading: pinch
+    assert trigger.update(0.04) is False  # still disarmed
+    assert trigger.update(None) is False  # no hand: re-arms
+    assert trigger.armed is True
+    assert trigger.update(0.050) is True
+    assert trigger.update(float("nan")) is False  # non-finite scalar: no pinch
+    assert trigger.update("0.04") is False  # non-numeric scalar: no pinch
