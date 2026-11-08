@@ -32,3 +32,36 @@ def test_model_path_that_is_a_directory_is_rejected(tmp_path):
     model_dir.mkdir()
     with pytest.raises(RuntimeError, match="not a file"):
         ensure_model(model_dir, expected_sha256="0" * 64)
+
+
+def test_unreadable_existing_model_reports_a_clear_error(monkeypatch, tmp_path):
+    # The checksum read used to sit outside the friendly-error handling,
+    # so an unreadable model file escaped as a bare OSError traceback.
+    import handportal.model as model_module
+
+    model = tmp_path / "model.task"
+    model.write_bytes(b"valid model")
+
+    def _boom(_path):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(model_module, "file_sha256", _boom)
+    with pytest.raises(RuntimeError, match="Could not read the hand model"):
+        ensure_model(model, expected_sha256="0" * 64)
+
+
+def test_uncreatable_model_directory_reports_a_clear_error(monkeypatch, tmp_path):
+    # The parent mkdir used to sit outside the friendly-error handling,
+    # so an uncreatable folder escaped as a bare OSError traceback.
+    from pathlib import Path
+
+    real_mkdir = Path.mkdir
+
+    def _boom(self, *args, **kwargs):
+        if self == tmp_path / "nested":
+            raise OSError("permission denied")
+        return real_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", _boom)
+    with pytest.raises(RuntimeError, match="Could not create the model directory"):
+        ensure_model(tmp_path / "nested" / "model.task", expected_sha256="0" * 64)

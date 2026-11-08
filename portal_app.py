@@ -688,7 +688,12 @@ def main(argv=None):
     # ---- app state ---------------------------------------------------
     effect_idx = 0
     shot_count = 0
-    pinch_trigger = PinchTrigger(args.pinch_threshold, min(0.22, args.pinch_threshold + 0.015))
+    # The hysteresis width comes from config (release - enter), not a
+    # hardcoded 0.015: editing PINCH_RELEASE_THRESHOLD in config used to
+    # silently do nothing because the release was always enter + 0.015.
+    # At the defaults this is identical (0.055 + 0.015 = 0.070).
+    pinch_width = config.PINCH_RELEASE_THRESHOLD - config.PINCH_ENTER_THRESHOLD
+    pinch_trigger = PinchTrigger(args.pinch_threshold, min(0.22, args.pinch_threshold + pinch_width))
     quad_smoother = QuadSmoother(alpha=0.35)
 
     detect_downscale = DETECT_DOWNSCALE
