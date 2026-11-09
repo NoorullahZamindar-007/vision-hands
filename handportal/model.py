@@ -1,5 +1,6 @@
 """Safe acquisition of the MediaPipe hand landmark model."""
 
+import http.client
 import tempfile
 import urllib.error
 import urllib.request
@@ -56,7 +57,10 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
         if file_sha256(temporary) != expected_sha256:
             raise RuntimeError("Downloaded MediaPipe model failed checksum verification.")
         temporary.replace(target)
-    except (OSError, urllib.error.URLError) as exc:
+    except (OSError, urllib.error.URLError, http.client.HTTPException) as exc:
+        # A connection that drops mid-download raises IncompleteRead
+        # (an HTTPException, not a URLError), which used to escape as a
+        # bare http.client traceback instead of the friendly error below.
         raise RuntimeError(
             f"Could not download the hand model. Check your connection or place it at {target}."
         ) from exc

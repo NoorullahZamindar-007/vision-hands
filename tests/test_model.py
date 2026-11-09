@@ -65,3 +65,20 @@ def test_uncreatable_model_directory_reports_a_clear_error(monkeypatch, tmp_path
     monkeypatch.setattr(Path, "mkdir", _boom)
     with pytest.raises(RuntimeError, match="Could not create the model directory"):
         ensure_model(tmp_path / "nested" / "model.task", expected_sha256="0" * 64)
+
+
+def test_interrupted_download_reports_a_clear_error(monkeypatch, tmp_path):
+    # A connection that drops mid-download raises IncompleteRead, which
+    # is an http.client.HTTPException rather than a URLError, so it used
+    # to escape ensure_model as a bare traceback instead of the
+    # friendly "Could not download" error.
+    import http.client
+
+    import handportal.model as model_module
+
+    def _boom(*args, **kwargs):
+        raise http.client.IncompleteRead(b"partial", 100)
+
+    monkeypatch.setattr(model_module.urllib.request, "urlopen", _boom)
+    with pytest.raises(RuntimeError, match="Could not download the hand model"):
+        ensure_model(tmp_path / "model.task", expected_sha256="0" * 64)
