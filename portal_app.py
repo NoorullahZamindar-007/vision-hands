@@ -692,8 +692,16 @@ def main(argv=None):
     # hardcoded 0.015: editing PINCH_RELEASE_THRESHOLD in config used to
     # silently do nothing because the release was always enter + 0.015.
     # At the defaults this is identical (0.055 + 0.015 = 0.070).
-    pinch_width = config.PINCH_RELEASE_THRESHOLD - config.PINCH_ENTER_THRESHOLD
-    pinch_trigger = PinchTrigger(args.pinch_threshold, min(0.22, args.pinch_threshold + pinch_width))
+    try:
+        pinch_width = config.PINCH_RELEASE_THRESHOLD - config.PINCH_ENTER_THRESHOLD
+        pinch_trigger = PinchTrigger(args.pinch_threshold, min(0.22, args.pinch_threshold + pinch_width))
+    except (TypeError, ValueError) as exc:
+        # A hand-edited config.py can set PINCH_RELEASE_THRESHOLD at or
+        # below PINCH_ENTER_THRESHOLD (or to a non-number): PinchTrigger
+        # rejects that, but as a bare traceback it hides which setting is
+        # wrong, so report it like the model startup error above.
+        print(f"Startup error: invalid pinch thresholds in handportal/config.py: {exc}")
+        return 1
     quad_smoother = QuadSmoother(alpha=0.35)
 
     detect_downscale = DETECT_DOWNSCALE
