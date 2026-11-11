@@ -466,8 +466,21 @@ _FONT_CANDIDATES = [
 ]
 
 
-def _find_font_path():
-    for p in _FONT_CANDIDATES:
+def _is_bold_font_candidate(path):
+    # DejaVuSans-Bold.ttf / Arial Bold.ttf carry "bold" in the name;
+    # arialbd.ttf (Windows) is the bold face with no "bold" substring.
+    name = os.path.basename(path).lower()
+    return "bold" in name or name.endswith("bd.ttf")
+
+
+def _find_font_path(bold=False):
+    """First existing candidate matching the requested weight.
+
+    Falls back to any existing candidate, so a system with only one
+    weight installed still gets a font instead of none.
+    """
+    preferred = [p for p in _FONT_CANDIDATES if _is_bold_font_candidate(p) == bold]
+    for p in preferred + _FONT_CANDIDATES:
         if os.path.exists(p):
             return p
     return None
@@ -479,7 +492,8 @@ _FONT_CACHE = {}
 
 def _font(size, bold=False):
     """
-    Returns a font of `size`. Prefers a real TTF (bold when available);
+    Returns a font of `size`, in the requested weight. Prefers a real
+    TTF (bold candidates when bold=True, regular ones otherwise);
     falls back to Pillow's scalable default font (ImageFont.load_default
     supports a size on Pillow >= 10.1), so the designed HUD still renders
     correctly on systems with no font files installed.
@@ -490,7 +504,12 @@ def _font(size, bold=False):
     f = _FONT_CACHE.get(key)
     if f is None:
         try:
-            f = ImageFont.truetype(FONT_PATH, size)
+            # _find_font_path used to ignore `bold` entirely, and the
+            # bold candidate is listed first, so every HUD font rendered
+            # bold — including the FPS pill and hint panel that ask for
+            # regular weight.
+            path = _find_font_path(bold) or FONT_PATH
+            f = ImageFont.truetype(path, size)
         except Exception:
             try:
                 f = ImageFont.load_default(size)
