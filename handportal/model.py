@@ -2,6 +2,7 @@
 
 import http.client
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from hashlib import sha256
@@ -49,21 +50,31 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
         ) from exc
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(dir=target.parent, suffix=".download", delete=False) as out:
-            temporary = Path(out.name)
-            with urllib.request.urlopen(url, timeout=30) as response:
-                while chunk := response.read(1024 * 1024):
-                    out.write(chunk)
+        for attempt in (1, 2):
+            try:
+                with tempfile.NamedTemporaryFile(dir=target.parent, suffix=".download", delete=False) as out:
+                    temporary = Path(out.name)
+                    with urllib.request.urlopen(url, timeout=30) as response:
+                        while chunk := response.read(1024 * 1024):
+                            out.write(chunk)
+                break
+            except (OSError, urllib.error.URLError, http.client.HTTPException) as exc:
+                # A connection that drops mid-download raises IncompleteRead
+                # (an HTTPException, not a URLError). One brief network blip
+                # at startup used to abort the app, even though the download
+                # is atomic and checksum-verified, so it is safe to retry
+                # once after a short pause before giving up.
+                if temporary is not None and temporary.exists():
+                    temporary.unlink()
+                    temporary = None
+                if attempt == 2:
+                    raise RuntimeError(
+                        f"Could not download the hand model. Check your connection or place it at {target}."
+                    ) from exc
+                time.sleep(2)
         if file_sha256(temporary) != expected_sha256:
             raise RuntimeError("Downloaded MediaPipe model failed checksum verification.")
         temporary.replace(target)
-    except (OSError, urllib.error.URLError, http.client.HTTPException) as exc:
-        # A connection that drops mid-download raises IncompleteRead
-        # (an HTTPException, not a URLError), which used to escape as a
-        # bare http.client traceback instead of the friendly error below.
-        raise RuntimeError(
-            f"Could not download the hand model. Check your connection or place it at {target}."
-        ) from exc
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()

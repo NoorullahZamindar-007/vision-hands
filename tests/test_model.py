@@ -67,6 +67,47 @@ def test_uncreatable_model_directory_reports_a_clear_error(monkeypatch, tmp_path
         ensure_model(tmp_path / "nested" / "model.task", expected_sha256="0" * 64)
 
 
+def test_transient_download_failure_is_retried_once(monkeypatch, tmp_path):
+    # One brief network blip at startup used to abort the app, even
+    # though the download is atomic and checksum-verified — so a single
+    # failure is retried once before the friendly error is raised.
+    import http.client
+    from io import BytesIO
+
+    import handportal.model as model_module
+    from handportal.model import file_sha256
+
+    payload = b"fake-model-bytes"
+    calls = {"n": 0}
+
+    class FakeResponse:
+        def __enter__(self):
+            return BytesIO(payload)
+
+        def __exit__(self, *args):
+            return False
+
+    def _flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise http.client.IncompleteRead(b"partial", 100)
+        return FakeResponse()
+
+    monkeypatch.setattr(model_module.urllib.request, "urlopen", _flaky)
+    monkeypatch.setattr(model_module.time, "sleep", lambda seconds: None)
+
+    import hashlib
+
+    target = tmp_path / "model.task"
+    result = ensure_model(
+        target, expected_sha256=hashlib.sha256(payload).hexdigest()
+    )
+
+    assert result == target
+    assert target.read_bytes() == payload
+    assert calls["n"] == 2
+
+
 def test_interrupted_download_reports_a_clear_error(monkeypatch, tmp_path):
     # A connection that drops mid-download raises IncompleteRead, which
     # is an http.client.HTTPException rather than a URLError, so it used

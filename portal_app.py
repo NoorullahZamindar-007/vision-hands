@@ -958,6 +958,12 @@ def main(argv=None):
         elif key == ord('s'):
             shot_count += 1
             fname = f"portal_shot_{time.strftime('%Y%m%d-%H%M%S')}-{shot_count}.png"
+            # shot_count resets to 0 on every launch, so two runs taking
+            # their first screenshot within the same second would
+            # silently overwrite each other's file; bump until free.
+            while os.path.exists(fname):
+                shot_count += 1
+                fname = f"portal_shot_{time.strftime('%Y%m%d-%H%M%S')}-{shot_count}.png"
             if cv2.imwrite(fname, frame):
                 print(f"Saved {fname}")
             else:
