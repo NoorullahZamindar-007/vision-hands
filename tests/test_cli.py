@@ -14,6 +14,21 @@ def test_cli_rejects_invalid_dimensions():
         parse_args(["--width", "0"])
 
 
+def test_cli_rejects_oversized_dimensions():
+    # Only "positive" was checked, so --width 100000 reached
+    # make_vignette_layer at startup and died allocating a gigantic
+    # array instead of failing with a clear usage error.
+    with pytest.raises(SystemExit):
+        parse_args(["--width", "100000", "--height", "720"])
+    with pytest.raises(SystemExit):
+        parse_args(["--width", "1280", "--height", "5000"])
+
+
+def test_cli_accepts_8k_dimensions():
+    args = parse_args(["--width", "7680", "--height", "4320"])
+    assert (args.width, args.height) == (7680, 4320)
+
+
 def test_cli_rejects_negative_camera_index():
     with pytest.raises(SystemExit):
         parse_args(["--camera", "-1"])

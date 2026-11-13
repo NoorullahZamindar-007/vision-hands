@@ -26,6 +26,12 @@ def parse_args(argv=None):
         parser.error("camera index must be non-negative")
     if args.width <= 0 or args.height <= 0:
         parser.error("width and height must be positive")
+    if args.width > 7680 or args.height > 4320:
+        # An absurd frame size otherwise reaches make_vignette_layer at
+        # startup, which tries to allocate the full frame as float32
+        # arrays and dies with an opaque MemoryError instead of a clear
+        # usage error. 7680x4320 (8K) is the largest real camera mode.
+        parser.error("width and height must be at most 7680x4320")
     if not 0.005 <= args.pinch_threshold <= 0.20:
         parser.error("pinch threshold must be between 0.005 and 0.20")
     if args.model is not None:
