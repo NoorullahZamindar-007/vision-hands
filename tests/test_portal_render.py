@@ -10,6 +10,7 @@ All tests below are webcam-independent (synthetic frames only).
 
 from types import SimpleNamespace
 
+import pytest
 import numpy as np
 
 import portal_app
@@ -186,3 +187,57 @@ def test_blend_panel_alpha_above_one_is_fully_opaque():
     portal_app.blend_panel(frame, panel, 10, 10, alpha=2.0)
 
     assert np.all(frame[15, 15] == 200)
+
+
+def _opaque_panel(value=200):
+    panel = np.zeros((20, 20, 4), dtype=np.uint8)
+    panel[:, :, :3] = value
+    panel[:, :, 3] = 255
+    return panel
+
+
+def test_blend_panel_clips_negative_offsets():
+    # A panel hung off the top-left corner must composite its visible
+    # part at the frame origin, not shift it or crash on the slice.
+    frame = np.full((100, 100, 3), 100, dtype=np.uint8)
+    portal_app.blend_panel(frame, _opaque_panel(), -10, -10, alpha=1.0)
+
+    assert np.all(frame[0, 0] == 200)   # visible part lands at the origin
+    assert np.all(frame[50, 50] == 100)  # far from the panel, untouched
+
+
+def test_blend_panel_fully_outside_frame_leaves_frame_unchanged():
+    frame = np.full((100, 100, 3), 100, dtype=np.uint8)
+    before = frame.copy()
+    portal_app.blend_panel(frame, _opaque_panel(), 500, 500, alpha=1.0)
+
+    assert np.array_equal(frame, before)
+
+
+def test_hud_panels_return_rgba_arrays():
+    # The PIL HUD builders had no coverage: a wrong height, a missing
+    # alpha channel, or an empty panel would only show up on a live run.
+    if not portal_app.PIL_AVAILABLE:
+        pytest.skip("PIL is unavailable")
+
+    effect = portal_app.build_effect_panel(0, "Thermal", None, 1.0, (255, 170, 64))
+    assert effect.shape[0] == 62 and effect.shape[1] >= 300 and effect.shape[2] == 4
+    assert effect.dtype == np.uint8
+    assert np.any(effect[:, :, 3] > 0)  # the panel is not fully transparent
+
+    fps = portal_app.build_fps_pill(59.4)
+    assert fps.shape[0] == 24 and fps.shape[2] == 4 and fps.dtype == np.uint8
+    assert np.any(fps[:, :, 3] > 0)
+
+    hint = portal_app.build_hint_panel()
+    assert hint.shape[0] == 28 and hint.shape[2] == 4 and hint.dtype == np.uint8
+    assert np.any(hint[:, :, 3] > 0)
+
+
+def test_hud_fallback_draws_without_pil():
+    # The OpenCV fallback HUD is only used when PIL is missing; it must
+    # still draw the effect name and FPS instead of crashing.
+    frame = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app._hud_fallback(frame, "Thermal", 30.0)
+
+    assert np.any(frame[:40, :] != 100)  # text lands in the top strip
