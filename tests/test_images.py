@@ -56,3 +56,14 @@ def test_quad_smoother_uses_exponential_average():
     second = np.full((4, 2), 10, dtype=np.float32)
     smoother.update(first)
     assert np.allclose(smoother.update(second), 5)
+
+
+def test_vignette_strength_above_one_matches_full_strength():
+    # A strength above 1 drove the layer below zero, which wrapped
+    # uint8 (corners came back mid-grey instead of black); it must
+    # saturate at full strength.
+    full = portal_app.make_vignette_layer(64, 48, strength=1.0)
+    over = portal_app.make_vignette_layer(64, 48, strength=2.0)
+
+    assert np.array_equal(over, full)
+    assert np.all(over[24, 32] == 255)  # centre stays untouched

@@ -272,6 +272,11 @@ def render_portal_into_quad(frame, effect_fn, quad_pts,
 
     Edits `frame` in place.
     """
+    # A negative alpha wrapped uint8 (alpha=-0.5 rendered the portal
+    # half-visible instead of hidden); saturate to 0..1 like the other
+    # render parameters. Values above 1 already behaved as opaque
+    # because the scaling below is skipped for alpha >= 1.
+    alpha = max(0.0, min(1.0, alpha))
     h, w = frame.shape[:2]
     x_min = max(int(math.floor(np.min(quad_pts[:, 0]))) - FEATHER_PX, 0)
     x_max = min(int(math.ceil(np.max(quad_pts[:, 0]))) + FEATHER_PX, w)
@@ -315,6 +320,9 @@ def draw_portal_glow(frame, quad_pts, color, intensity):
     outline is drawn — this reads as an energy window, not a border.
     `intensity` 0..1 scales the bloom.
     """
+    # An intensity above 1 wrapped uint8 (1.004 -> 256 -> 0 made the
+    # glow vanish, 1.5 came back dimmer than full); saturate to 0..1.
+    intensity = max(0.0, min(1.0, intensity))
     h, w = frame.shape[:2]
     x_min = max(int(math.floor(np.min(quad_pts[:, 0]))) - GLOW_PAD, 0)
     x_max = min(int(math.ceil(np.max(quad_pts[:, 0]))) + GLOW_PAD, w)
@@ -433,6 +441,10 @@ def draw_particles(frame, particles, color):
 # ----------------------------------------------------------------------
 def make_vignette_layer(w, h, strength=0.30, inner=0.45):
     """Pre-computed radial vignette as a uint8 BGR layer (0 = black)."""
+    # A strength above 1 drives the layer below zero, which wraps uint8
+    # (the corners came back mid-grey instead of black); saturate to
+    # 0..1 like the other render parameters.
+    strength = max(0.0, min(1.0, strength))
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     nx = (xx / max(w - 1, 1)) * 2.0 - 1.0
     ny = (yy / max(h - 1, 1)) * 2.0 - 1.0
@@ -529,6 +541,9 @@ def _text_width(text, font):
 def blend_panel(frame, panel, x, y, alpha=1.0):
     """Alpha-composite a small RGBA numpy panel onto the BGR frame.
     `alpha` (0..1) scales the panel's opacity (used to fade the hint out)."""
+    # An alpha above 1 wrapped uint8 arithmetic (alpha=2.0 turned a
+    # 200-grey panel into 44) instead of saturating; clamp it first.
+    alpha = max(0.0, min(1.0, float(alpha)))
     if panel is None or alpha <= 0.0:
         return
     ph, pw = panel.shape[:2]

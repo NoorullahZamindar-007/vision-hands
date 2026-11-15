@@ -134,3 +134,55 @@ def test_draw_particles_marks_the_frame():
     portal_app.draw_particles(frame, particles, (0, 255, 0))
 
     assert np.any(frame[95:106, 95:106] != 100)
+
+
+def test_render_portal_negative_alpha_leaves_frame_unchanged():
+    # A negative alpha wrapped uint8 (alpha=-0.5 rendered the portal
+    # half-visible instead of hidden); it must behave exactly like 0.
+    frame = np.full((200, 200, 3), 100, dtype=np.uint8)
+    before = frame.copy()
+    portal_app.render_portal_into_quad(frame, _solid(200), _quad(), alpha=-0.5)
+
+    assert np.array_equal(frame, before)
+
+
+def test_render_portal_alpha_above_one_is_fully_opaque():
+    # Above 1 the portal must stay fully opaque, never wrap back toward
+    # transparent as the uint8 mask scaling used to do.
+    frame = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app.render_portal_into_quad(frame, _solid(200), _quad(), alpha=2.0)
+
+    assert np.all(frame[100, 100] == 200)
+
+
+def test_portal_glow_intensity_above_one_matches_full_intensity():
+    # An intensity above 1 wrapped uint8 (1.004 -> 256 -> 0 made the
+    # glow vanish, 1.5 came back dimmer than full); it must saturate.
+    full = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app.draw_portal_glow(full, _quad(), (0, 0, 255), intensity=1.0)
+    over = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app.draw_portal_glow(over, _quad(), (0, 0, 255), intensity=1.5)
+
+    assert np.array_equal(over, full)
+
+
+def test_portal_glow_negative_intensity_matches_zero():
+    # A negative intensity must behave exactly like no glow at all.
+    zero = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app.draw_portal_glow(zero, _quad(), (0, 0, 255), intensity=0.0)
+    negative = np.full((200, 200, 3), 100, dtype=np.uint8)
+    portal_app.draw_portal_glow(negative, _quad(), (0, 0, 255), intensity=-0.5)
+
+    assert np.array_equal(negative, zero)
+
+
+def test_blend_panel_alpha_above_one_is_fully_opaque():
+    # An alpha above 1 wrapped uint8 arithmetic (alpha=2.0 turned a
+    # 200-grey panel into 44) instead of saturating at full opacity.
+    panel = np.zeros((20, 20, 4), dtype=np.uint8)
+    panel[:, :, :3] = 200
+    panel[:, :, 3] = 255
+    frame = np.full((100, 100, 3), 100, dtype=np.uint8)
+    portal_app.blend_panel(frame, panel, 10, 10, alpha=2.0)
+
+    assert np.all(frame[15, 15] == 200)
