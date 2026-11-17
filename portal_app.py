@@ -277,6 +277,12 @@ def render_portal_into_quad(frame, effect_fn, quad_pts,
     # render parameters. Values above 1 already behaved as opaque
     # because the scaling below is skipped for alpha >= 1.
     alpha = max(0.0, min(1.0, alpha))
+    # Same for the crossfade weight: addWeighted saturates instead of
+    # erroring, so blend=1.5 overshot the new effect to white and
+    # blend=-0.5 undershot the old one to black. It is 0..1 in the
+    # main loop, but the parameter is public, so clamp it here like
+    # alpha rather than trusting every caller.
+    blend = max(0.0, min(1.0, float(blend)))
     h, w = frame.shape[:2]
     x_min = max(int(math.floor(np.min(quad_pts[:, 0]))) - FEATHER_PX, 0)
     x_max = min(int(math.ceil(np.max(quad_pts[:, 0]))) + FEATHER_PX, w)

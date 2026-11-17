@@ -58,6 +58,18 @@ def test_render_portal_crossfade_blend_endpoints():
         assert np.all(frame[100, 100] == expected)
 
 
+def test_render_portal_crossfade_blend_clamped():
+    # blend is a 0..1 weight: above 1 it overshot the new effect to
+    # white (255) and below 0 it undershot the old one to black,
+    # because addWeighted saturates instead of erroring.
+    for blend, expected in ((1.5, 200), (-0.5, 50)):
+        frame = np.full((200, 200, 3), 100, dtype=np.uint8)
+        portal_app.render_portal_into_quad(
+            frame, _solid(200), _quad(), prev_effect_fn=_solid(50), blend=blend
+        )
+        assert np.all(frame[100, 100] == expected)
+
+
 def _fake_hand(tip_x, tip_y):
     landmarks = [SimpleNamespace(x=0.5, y=0.5) for _ in range(21)]
     landmarks[portal_app.INDEX_TIP] = SimpleNamespace(x=tip_x, y=tip_y)
