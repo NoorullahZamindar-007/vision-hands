@@ -229,7 +229,7 @@ The test suite covers gesture hysteresis, model integrity checks, effects, geome
 
 Pull requests are welcome! Some ideas:
 
-- 🎨 **New effects** — add your own `fx_*` function and append it to `EFFECTS` / `EFFECT_NAMES`
+- 🎨 **New effects** — add your own effect function (plain name, like the existing `thermal` and `edge_mesh`) and append it to `EFFECTS` / `EFFECT_NAMES`
 - 🎯 **Gesture controls** — map new hand gestures to actions
 - 📱 **Mobile support** — port to a web-based solution with MediaPipe JS
 - 🎥 **Video recording** — capture the portal output as a video file
