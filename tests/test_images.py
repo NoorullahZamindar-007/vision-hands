@@ -67,3 +67,23 @@ def test_vignette_strength_above_one_matches_full_strength():
 
     assert np.array_equal(over, full)
     assert np.all(over[24, 32] == 255)  # centre stays untouched
+
+
+def test_vignette_inner_radius_is_clamped():
+    # `inner` is the radius where the darkening starts, with a fixed
+    # outer radius of 1.6: a negative inner darkened even the centre,
+    # and inner >= 1.6 divided by zero (no vignette, plus a
+    # RuntimeWarning) or darkened the whole frame uniformly.
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        over = portal_app.make_vignette_layer(64, 48, inner=1.6)
+    full = portal_app.make_vignette_layer(64, 48, inner=1.5)
+    assert np.array_equal(over, full)
+    assert np.all(full[24, 32] == 255)  # centre stays untouched
+
+    zero = portal_app.make_vignette_layer(64, 48, inner=0.0)
+    negative = portal_app.make_vignette_layer(64, 48, inner=-1.0)
+    assert np.array_equal(negative, zero)
+    assert np.all(zero[24, 32] >= 254)  # centre (nearly) untouched

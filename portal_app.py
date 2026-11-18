@@ -451,6 +451,13 @@ def make_vignette_layer(w, h, strength=0.30, inner=0.45):
     # (the corners came back mid-grey instead of black); saturate to
     # 0..1 like the other render parameters.
     strength = max(0.0, min(1.0, strength))
+    # `inner` is the normalized radius where the darkening starts and
+    # the falloff runs to a fixed outer radius of 1.6: a negative inner
+    # darkened even the centre, and inner >= 1.6 divided by zero (no
+    # vignette at all, plus a RuntimeWarning) or, past 1.6, darkened
+    # the whole frame uniformly. Clamp it to the range where the
+    # falloff is well-defined.
+    inner = max(0.0, min(1.5, float(inner)))
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     nx = (xx / max(w - 1, 1)) * 2.0 - 1.0
     ny = (yy / max(h - 1, 1)) * 2.0 - 1.0
