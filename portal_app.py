@@ -231,7 +231,7 @@ def _dim(color, f):
 
 
 def _lerp_color(c1, c2, t):
-    return tuple(int(round(a + (b - a) * t)) for a, b in zip(c1, c2))
+    return tuple(int(round(a + (b - a) * t)) for a, b in zip(c1, c2, strict=True))
 
 
 def _pil_rgb(color, a=255):

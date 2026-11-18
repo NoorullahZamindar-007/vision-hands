@@ -10,8 +10,8 @@ All tests below are webcam-independent (synthetic frames only).
 
 from types import SimpleNamespace
 
-import pytest
 import numpy as np
+import pytest
 
 import portal_app
 

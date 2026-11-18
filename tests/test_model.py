@@ -75,7 +75,6 @@ def test_transient_download_failure_is_retried_once(monkeypatch, tmp_path):
     from io import BytesIO
 
     import handportal.model as model_module
-    from handportal.model import file_sha256
 
     payload = b"fake-model-bytes"
     calls = {"n": 0}
