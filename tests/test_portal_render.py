@@ -8,6 +8,8 @@ running the webcam app, so a compositing regression shipped silently.
 All tests below are webcam-independent (synthetic frames only).
 """
 
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -253,3 +255,49 @@ def test_hud_fallback_draws_without_pil():
     portal_app._hud_fallback(frame, "Thermal", 30.0)
 
     assert np.any(frame[:40, :] != 100)  # text lands in the top strip
+
+
+def _no_display(monkeypatch):
+    # Force every detection backend to fail: tkinter cannot be imported
+    # and both shell probes raise, so the hardcoded fallback is reached.
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+    monkeypatch.setattr(
+        subprocess, "check_output", lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("no such tool"))
+    )
+
+
+def test_detect_screen_resolution_falls_back_to_1080p(monkeypatch):
+    # With no display server and no xrandr/xdpyinfo, the app must still
+    # start fullscreen at a sane size instead of crashing.
+    _no_display(monkeypatch)
+    assert portal_app._detect_screen_resolution() == (1920, 1080)
+
+
+def test_detect_screen_resolution_parses_xrandr(monkeypatch):
+    # The asterisk marks the current mode line; the resolution is the
+    # first token on that line.
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+    xrandr = (
+        "Screen 0: minimum 8 x 8, current 1920 x 1080, maximum 32767 x 32767\n"
+        "HDMI-1 connected primary 1920x1080+0+0\n"
+        "   1920x1080     60.00*+  59.94\n"
+        "   1280x720      60.00\n"
+    )
+    monkeypatch.setattr(
+        subprocess, "check_output", lambda *args, **kwargs: xrandr.encode()
+    )
+    assert portal_app._detect_screen_resolution() == (1920, 1080)
+
+
+def test_detect_screen_resolution_parses_xdpyinfo(monkeypatch):
+    # When xrandr is missing but xdpyinfo works, the dimensions line is
+    # the fallback source.
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+
+    def _fake_check_output(cmd, *args, **kwargs):
+        if cmd == ["xrandr"]:
+            raise FileNotFoundError("no xrandr")
+        return b"  dimensions:    2560x1440 pixels (677x381 millimeters)\n"
+
+    monkeypatch.setattr(subprocess, "check_output", _fake_check_output)
+    assert portal_app._detect_screen_resolution() == (2560, 1440)
