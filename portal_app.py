@@ -772,7 +772,10 @@ def main(argv=None):
 
     hint_panel = build_hint_panel() if PIL_AVAILABLE else None
     fps_pill = build_fps_pill(fps) if PIL_AVAILABLE else None
-    vignette_layer = make_vignette_layer(FRAME_W, FRAME_H)  # precomputed once
+    # Built lazily in the loop at the camera's real frame size: precomputing
+    # it here at the requested size wasted a full-size layer (up to ~1.6 GB
+    # transient at 8K) that the loop immediately rebuilt and discarded.
+    vignette_layer = None
 
     cv2.namedWindow("Hand Portal", cv2.WINDOW_NORMAL | cv2.WINDOW_FREERATIO)
     cv2.resizeWindow("Hand Portal", FRAME_W, FRAME_H)
