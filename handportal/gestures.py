@@ -26,6 +26,10 @@ class PinchTrigger:
             raise ValueError("pinch thresholds must satisfy 0 < enter < release")
         self._initial_enter = self.enter_threshold
         self._initial_release = self.release_threshold
+        # Fixed at construction: adjust() used to recompute the width from
+        # the current (possibly cap-clamped) thresholds, so a wide
+        # hysteresis permanently narrowed every time the release cap bound.
+        self._width = self.release_threshold - self.enter_threshold
 
     def update(self, distances):
         # A single reading (or None for "no hand") is a natural call:
@@ -56,9 +60,8 @@ class PinchTrigger:
         return False
 
     def adjust(self, delta):
-        width = self.release_threshold - self.enter_threshold
         self.enter_threshold = min(0.20, max(0.005, self.enter_threshold + delta))
-        self.release_threshold = min(0.22, self.enter_threshold + width)
+        self.release_threshold = min(0.22, self.enter_threshold + self._width)
 
     def reset(self):
         """Restore the thresholds this trigger was constructed with."""

@@ -44,6 +44,20 @@ def test_adjust_keeps_hysteresis_width():
     assert trigger.release_threshold == pytest.approx(0.065)
 
 
+def test_adjust_does_not_ratchet_hysteresis_when_release_cap_binds():
+    # With a wide hysteresis the release cap (0.22) binds on a big upward
+    # adjust; adjust() used to recompute the width from the clamped
+    # thresholds, so the width shrank (0.04 -> 0.02) and never recovered.
+    trigger = PinchTrigger(0.18, 0.22)
+    trigger.adjust(0.03)  # enter 0.20, release capped at 0.22
+    assert trigger.enter_threshold == pytest.approx(0.20)
+    assert trigger.release_threshold == pytest.approx(0.22)
+
+    trigger.adjust(-0.03)  # enter 0.17: the width must still be 0.04
+    assert trigger.enter_threshold == pytest.approx(0.17)
+    assert trigger.release_threshold == pytest.approx(0.21)
+
+
 def test_adjust_clamps_enter_threshold_bounds():
     trigger = PinchTrigger(0.055, 0.070)
     trigger.adjust(-1.0)
