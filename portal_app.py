@@ -803,10 +803,15 @@ def main(argv=None):
           "| 'f' fullscreen | 'd' downscaled detection | 'v' vignette "
           "| pinch (thumb+index, either hand) to switch effect")
 
+    # A camera that stops mid-run is a failure, not a clean quit: the
+    # camera-open failure above already returns 1, so this does too
+    # instead of exiting 0 as if the user had pressed 'q'.
+    camera_failed = False
     while True:
         ok, frame = cap.read()
         if not ok:
             print("Camera stopped returning frames; closing HandPortal.")
+            camera_failed = True
             break
 
         frame = cv2.flip(frame, 1)
@@ -1040,7 +1045,7 @@ def main(argv=None):
     cap.release()
     cv2.destroyAllWindows()
     landmarker.close()
-    return 0
+    return 1 if camera_failed else 0
 
 
 if __name__ == "__main__":
