@@ -805,8 +805,11 @@ def main(argv=None):
 
     # A camera that stops mid-run is a failure, not a clean quit: the
     # camera-open failure above already returns 1, so this does too
-    # instead of exiting 0 as if the user had pressed 'q'.
+    # instead of exiting 0 as if the user had pressed 'q'. A hand
+    # detection failure is the same kind of failure, so it shares the
+    # exit code.
     camera_failed = False
+    detection_failed = False
     while True:
         ok, frame = cap.read()
         if not ok:
@@ -845,7 +848,15 @@ def main(argv=None):
 
         # VIDEO mode wants a monotonically increasing timestamp in ms
         timestamp_ms = int((now - t0) * 1000)
-        result = landmarker.detect_for_video(mp_image, timestamp_ms)
+        try:
+            result = landmarker.detect_for_video(mp_image, timestamp_ms)
+        except Exception as exc:
+            # A detection failure (a repeated timestamp, a model error)
+            # used to kill the app with a bare traceback; report it
+            # like the camera failures and exit 1 instead.
+            print(f"Hand detection failed: {exc}; closing HandPortal.")
+            detection_failed = True
+            break
 
         # ---- pinch + box (independent systems, as required) -----------
         pinch_distances = []
@@ -1045,7 +1056,7 @@ def main(argv=None):
     cap.release()
     cv2.destroyAllWindows()
     landmarker.close()
-    return 1 if camera_failed else 0
+    return 1 if camera_failed or detection_failed else 0
 
 
 if __name__ == "__main__":
