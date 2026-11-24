@@ -72,9 +72,20 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
                         f"Could not download the hand model. Check your connection or place it at {target}."
                     ) from exc
                 time.sleep(2)
-        if file_sha256(temporary) != expected_sha256:
-            raise RuntimeError("Downloaded MediaPipe model failed checksum verification.")
-        temporary.replace(target)
+        # The checksum read and the install below used to sit outside
+        # the friendly-error handling, so an unreadable temp file (or
+        # a failed move into place) escaped as a bare OSError
+        # traceback at startup instead of a clear message — the same
+        # class of failure the existing-file path above already wraps.
+        try:
+            if file_sha256(temporary) != expected_sha256:
+                raise RuntimeError("Downloaded MediaPipe model failed checksum verification.")
+            temporary.replace(target)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not install the downloaded hand model at {target}. "
+                "Check permissions and retry."
+            ) from exc
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink()

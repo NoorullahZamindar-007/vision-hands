@@ -67,6 +67,66 @@ def test_uncreatable_model_directory_reports_a_clear_error(monkeypatch, tmp_path
         ensure_model(tmp_path / "nested" / "model.task", expected_sha256="0" * 64)
 
 
+def test_unreadable_downloaded_model_reports_a_clear_error(monkeypatch, tmp_path):
+    # The post-download checksum read used to sit outside the
+    # friendly-error handling, so an unreadable temp file escaped as a
+    # bare OSError traceback instead of a clear startup error.
+    import hashlib
+    from io import BytesIO
+
+    import handportal.model as model_module
+
+    payload = b"fake-model-bytes"
+
+    class FakeResponse:
+        def __enter__(self):
+            return BytesIO(payload)
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(model_module.urllib.request, "urlopen", lambda *a, **k: FakeResponse())
+
+    def _boom(_path):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(model_module, "file_sha256", _boom)
+    with pytest.raises(RuntimeError, match="Could not install the downloaded hand model"):
+        ensure_model(tmp_path / "model.task", expected_sha256=hashlib.sha256(payload).hexdigest())
+
+
+def test_failed_model_install_reports_a_clear_error(monkeypatch, tmp_path):
+    # Same for the move into place: a failed replace used to escape as
+    # a bare OSError instead of a clear startup error.
+    import hashlib
+    from io import BytesIO
+    from pathlib import Path
+
+    import handportal.model as model_module
+
+    payload = b"fake-model-bytes"
+
+    class FakeResponse:
+        def __enter__(self):
+            return BytesIO(payload)
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(model_module.urllib.request, "urlopen", lambda *a, **k: FakeResponse())
+
+    real_replace = Path.replace
+
+    def _boom(self, target):
+        if self.suffix == ".download":
+            raise OSError("permission denied")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _boom)
+    with pytest.raises(RuntimeError, match="Could not install the downloaded hand model"):
+        ensure_model(tmp_path / "model.task", expected_sha256=hashlib.sha256(payload).hexdigest())
+
+
 def test_transient_download_failure_is_retried_once(monkeypatch, tmp_path):
     # One brief network blip at startup used to abort the app, even
     # though the download is atomic and checksum-verified — so a single
