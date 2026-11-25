@@ -58,12 +58,15 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
                         while chunk := response.read(1024 * 1024):
                             out.write(chunk)
                 break
-            except (OSError, urllib.error.URLError, http.client.HTTPException) as exc:
+            except (OSError, urllib.error.URLError, http.client.HTTPException, ValueError) as exc:
                 # A connection that drops mid-download raises IncompleteRead
                 # (an HTTPException, not a URLError). One brief network blip
                 # at startup used to abort the app, even though the download
                 # is atomic and checksum-verified, so it is safe to retry
-                # once after a short pause before giving up.
+                # once after a short pause before giving up. A malformed URL
+                # raises ValueError from urlopen ("unknown url type") instead
+                # of a URLError, so without it a bad URL escaped as a bare
+                # traceback rather than the "Could not download" error.
                 if temporary is not None and temporary.exists():
                     temporary.unlink()
                     temporary = None

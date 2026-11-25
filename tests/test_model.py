@@ -182,3 +182,15 @@ def test_interrupted_download_reports_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.setattr(model_module.urllib.request, "urlopen", _boom)
     with pytest.raises(RuntimeError, match="Could not download the hand model"):
         ensure_model(tmp_path / "model.task", expected_sha256="0" * 64)
+
+
+def test_malformed_download_url_reports_a_clear_error(monkeypatch, tmp_path):
+    # A malformed URL raises ValueError from urlopen ("unknown url
+    # type") instead of a URLError, so it used to escape ensure_model
+    # as a bare traceback instead of the friendly "Could not download"
+    # error. The retry still runs once, so the sleep is stubbed out.
+    import handportal.model as model_module
+
+    monkeypatch.setattr(model_module.time, "sleep", lambda seconds: None)
+    with pytest.raises(RuntimeError, match="Could not download the hand model"):
+        ensure_model(tmp_path / "model.task", url="notaurl", expected_sha256="0" * 64)
