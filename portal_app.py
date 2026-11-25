@@ -175,6 +175,12 @@ class QuadSmoother:
         self.smoothed = None
 
     def update(self, quad_pts):
+        # A glitchy landmark (NaN/inf) makes the quad non-finite; the
+        # EMA below would store it and stay NaN forever (0.35*x +
+        # 0.65*nan == nan), so the portal could never recover. Drop
+        # the bad frame and keep the last good quad instead.
+        if not np.isfinite(quad_pts).all():
+            return self.smoothed
         if self.smoothed is None or self.smoothed.shape != quad_pts.shape:
             self.smoothed = quad_pts.copy()
         else:
@@ -197,10 +203,16 @@ def build_quad_from_index_fingers(hand_a, hand_b, w, h):
     on its own side (left or right, whichever x it's on); the other hand
     forms the opposite corner automatically since it's just a bounding box.
 
-    Returns points ordered TL, TR, BR, BL for consistent use downstream.
+    Returns points ordered TL, TR, BR, BL for consistent use downstream,
+    or None when a fingertip landmark is non-finite (a glitchy frame):
+    a NaN tip would make math.floor raise in the render and poison the
+    quad smoother, so the frame is dropped instead of rendered.
     """
     tip_a = landmark_px(hand_a[INDEX_TIP], w, h)
     tip_b = landmark_px(hand_b[INDEX_TIP], w, h)
+
+    if not np.isfinite(tip_a).all() or not np.isfinite(tip_b).all():
+        return None
 
     x_min, x_max = sorted([tip_a[0], tip_b[0]])
     y_min, y_max = sorted([tip_a[1], tip_b[1]])
@@ -874,7 +886,13 @@ def main(argv=None):
         if len(hands_list) == 2:
             hand_a, hand_b = hands_list
             raw_quad = build_quad_from_index_fingers(hand_a, hand_b, w, h)
-            quad_pts = quad_smoother.update(raw_quad)
+            if raw_quad is None:
+                # A glitchy landmark made this frame's quad unusable;
+                # drop the frame like a one-hand frame instead of
+                # crashing in the render or poisoning the smoother.
+                quad_smoother.reset()
+            else:
+                quad_pts = quad_smoother.update(raw_quad)
 
             for hand in (hand_a, hand_b):
                 d = pinch_distance(hand)

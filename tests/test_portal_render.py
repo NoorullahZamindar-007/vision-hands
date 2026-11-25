@@ -101,6 +101,47 @@ def test_build_quad_enforces_minimum_box():
     assert quad[0][1] == 40 and quad[2][1] == 60  # 20 px tall
 
 
+def test_build_quad_returns_none_for_non_finite_landmark():
+    # A glitchy landmark (NaN) used to make the quad NaN, and
+    # math.floor(nan) in the render raised ValueError and killed the
+    # app with a bare traceback. The frame is dropped instead.
+    quad = portal_app.build_quad_from_index_fingers(
+        _fake_hand(float("nan"), 0.3), _fake_hand(0.6, 0.7), 200, 100
+    )
+
+    assert quad is None
+
+
+def test_build_quad_returns_none_for_infinite_landmark():
+    quad = portal_app.build_quad_from_index_fingers(
+        _fake_hand(0.2, 0.3), _fake_hand(float("inf"), 0.7), 200, 100
+    )
+
+    assert quad is None
+
+
+def test_quad_smoother_ignores_non_finite_quad():
+    # A NaN quad used to poison the EMA forever (0.35*x + 0.65*nan
+    # == nan), so the portal never recovered even if the render were
+    # guarded. The bad frame is dropped and the last good quad kept.
+    smoother = portal_app.QuadSmoother(alpha=0.35)
+    good = np.array([[40, 30], [120, 30], [120, 70], [40, 70]], dtype=np.float32)
+    smoother.update(good)
+
+    assert np.allclose(
+        smoother.update(np.full((4, 2), np.nan, dtype=np.float32)), good
+    )
+    assert np.isfinite(smoother.smoothed).all()
+    # A good frame afterwards still smooths from the good state.
+    assert np.isfinite(smoother.update(good)).all()
+
+
+def test_quad_smoother_non_finite_first_frame_returns_none():
+    smoother = portal_app.QuadSmoother()
+
+    assert smoother.update(np.full((4, 2), np.nan, dtype=np.float32)) is None
+
+
 def test_portal_glow_only_brightens():
     frame = np.full((200, 200, 3), 100, dtype=np.uint8)
     before = frame.copy()
