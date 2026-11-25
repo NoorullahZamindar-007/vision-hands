@@ -194,3 +194,33 @@ def test_malformed_download_url_reports_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.setattr(model_module.time, "sleep", lambda seconds: None)
     with pytest.raises(RuntimeError, match="Could not download the hand model"):
         ensure_model(tmp_path / "model.task", url="notaurl", expected_sha256="0" * 64)
+
+
+def test_oversized_model_download_is_refused(monkeypatch, tmp_path):
+    # The download loop used to read until EOF with no total limit, so
+    # a misbehaving server could stream gigabytes to disk until it
+    # filled. The real model is ~7 MB; refuse anything over the 64 MB
+    # cap instead of retrying (an oversized stream will not shrink).
+    import handportal.model as model_module
+
+    class OversizedResponse:
+        """Yields 1 MB chunks until the caller stops reading."""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, size=-1):
+            return b"x" * (1024 * 1024)
+
+    monkeypatch.setattr(
+        model_module.urllib.request, "urlopen", lambda *a, **k: OversizedResponse()
+    )
+
+    with pytest.raises(RuntimeError, match="larger than expected"):
+        ensure_model(tmp_path / "model.task", expected_sha256="0" * 64)
+
+    assert not (tmp_path / "model.task").exists()
+    assert not list(tmp_path.glob("*.download"))

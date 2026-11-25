@@ -11,6 +11,12 @@ from pathlib import Path
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
 
+# The real model is ~7 MB (README). Cap the download well above it so
+# a misbehaving server — or a wrong url passed to ensure_model — cannot
+# stream unbounded bytes to disk until it fills. The checksum below
+# verifies content, not size.
+MAX_MODEL_BYTES = 64 * 1024 * 1024
+
 
 def file_sha256(path):
     digest = sha256()
@@ -55,7 +61,20 @@ def ensure_model(path, url=MODEL_URL, expected_sha256=MODEL_SHA256):
                 with tempfile.NamedTemporaryFile(dir=target.parent, suffix=".download", delete=False) as out:
                     temporary = Path(out.name)
                     with urllib.request.urlopen(url, timeout=30) as response:
+                        total = 0
                         while chunk := response.read(1024 * 1024):
+                            total += len(chunk)
+                            if total > MAX_MODEL_BYTES:
+                                # A RuntimeError bypasses the retry
+                                # handler below (it only retries OSError,
+                                # URLError, HTTPException and ValueError):
+                                # an oversized stream will not shrink on
+                                # retry, and the finally still deletes
+                                # the temp file.
+                                raise RuntimeError(
+                                    "Downloaded hand model is larger than expected "
+                                    f"({MAX_MODEL_BYTES // (1024 * 1024)} MB); refusing to save it."
+                                )
                             out.write(chunk)
                 break
             except (OSError, urllib.error.URLError, http.client.HTTPException, ValueError) as exc:
