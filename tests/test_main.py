@@ -113,3 +113,32 @@ def test_detection_failure_mid_run_exits_nonzero(monkeypatch, capsys):
 
     assert portal_app.main(["--windowed"]) == 1
     assert "Hand detection failed" in capsys.readouterr().out
+
+
+def test_no_display_window_exits_nonzero(monkeypatch, capsys):
+    # On a headless machine (or an OpenCV build without a GUI backend)
+    # namedWindow raises cv2.error; like every other startup failure
+    # it must exit 1 with a clear message, not a bare traceback.
+    for name in ("CAM_INDEX", "FRAME_W", "FRAME_H", "FULLSCREEN",
+                 "DETECT_DOWNSCALE", "VIGNETTE", "MODEL_PATH"):
+        monkeypatch.setattr(portal_app, name, getattr(portal_app, name))
+    monkeypatch.setattr(portal_app, "ensure_model_downloaded",
+                        lambda: Path("fake.task"))
+    monkeypatch.setattr(portal_app, "_detect_screen_resolution",
+                        lambda: (1920, 1080))
+    monkeypatch.setattr(portal_app.cv2, "VideoCapture", _FakeFrameCapture)
+
+    def _no_window(*args, **kwargs):
+        raise cv2.error("The function is not implemented.")
+
+    monkeypatch.setattr(portal_app.cv2, "namedWindow", _no_window)
+    monkeypatch.setattr(portal_app.cv2, "resizeWindow", lambda *args, **kwargs: None)
+    monkeypatch.setattr(portal_app.cv2, "destroyAllWindows", lambda: None)
+    monkeypatch.setattr(
+        portal_app.mp_vision.HandLandmarker,
+        "create_from_options",
+        staticmethod(lambda options: _FakeLandmarker()),
+    )
+
+    assert portal_app.main(["--windowed"]) == 1
+    assert "Could not open a display window" in capsys.readouterr().out

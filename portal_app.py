@@ -777,8 +777,15 @@ def main(argv=None):
     # transient at 8K) that the loop immediately rebuilt and discarded.
     vignette_layer = None
 
-    cv2.namedWindow("Hand Portal", cv2.WINDOW_NORMAL | cv2.WINDOW_FREERATIO)
-    cv2.resizeWindow("Hand Portal", FRAME_W, FRAME_H)
+    # A headless machine (or an OpenCV build without a GUI backend)
+    # raises cv2.error here; like every other startup failure, report
+    # it plainly and exit 1 instead of dying with a bare traceback.
+    try:
+        cv2.namedWindow("Hand Portal", cv2.WINDOW_NORMAL | cv2.WINDOW_FREERATIO)
+        cv2.resizeWindow("Hand Portal", FRAME_W, FRAME_H)
+    except cv2.error as exc:
+        print(f"Could not open a display window: {exc} HandPortal needs a desktop session with a display.")
+        return 1
 
     screen_res = _detect_screen_resolution()   # fallback for getWindowImageRect
     if screen_res:
