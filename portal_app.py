@@ -863,16 +863,18 @@ def main(argv=None):
                                cv2.COLOR_BGR2RGB)
         else:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-
         # VIDEO mode wants a monotonically increasing timestamp in ms
         timestamp_ms = int((now - t0) * 1000)
         try:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
             result = landmarker.detect_for_video(mp_image, timestamp_ms)
         except Exception as exc:
             # A detection failure (a repeated timestamp, a model error)
             # used to kill the app with a bare traceback; report it
-            # like the camera failures and exit 1 instead.
+            # like the camera failures and exit 1 instead. Building
+            # the MediaPipe image is part of the same step: a missing
+            # native library (e.g. libGLESv2) raises here, not in
+            # detect_for_video, and must fail the same clean way.
             print(f"Hand detection failed: {exc}; closing HandPortal.")
             detection_failed = True
             break
