@@ -11,7 +11,8 @@ def build_parser():
     parser.add_argument("--camera", type=int, default=config.CAM_INDEX, help="camera device index")
     parser.add_argument("--width", type=int, default=config.FRAME_W, help="requested frame width")
     parser.add_argument("--height", type=int, default=config.FRAME_H, help="requested frame height")
-    parser.add_argument("--pinch-threshold", type=float, default=config.PINCH_ENTER_THRESHOLD)
+    parser.add_argument("--pinch-threshold", type=float, default=config.PINCH_ENTER_THRESHOLD,
+                          help="normalized thumb-index distance that counts as a pinch (0.005-0.20)")
     parser.add_argument("--windowed", action="store_true", help="start in a resizable window")
     parser.add_argument("--downscale", action="store_true", help="detect hands at half resolution")
     parser.add_argument("--no-vignette", action="store_true", help="disable the vignette")

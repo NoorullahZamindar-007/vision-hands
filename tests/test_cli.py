@@ -51,3 +51,19 @@ def test_cli_accepts_existing_model_file(tmp_path):
     model.write_bytes(b"fake-model")
     args = parse_args(["--model", str(model)])
     assert args.model == str(model)
+
+
+def test_every_cli_option_has_help_text():
+    """Every option must document itself in --help.
+
+    --pinch-threshold was the only flag without help text, so
+    `handportal --help` left the one tunable users actually adjust
+    unexplained (including its 0.005-0.20 range).
+    """
+    from handportal.cli import build_parser
+
+    parser = build_parser()
+    for action in parser._actions:
+        if action.dest == "help":
+            continue
+        assert action.help, f"--{action.dest} has no help text"
